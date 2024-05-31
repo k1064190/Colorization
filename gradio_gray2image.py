@@ -10,11 +10,11 @@ from annotator.util import resize_image, HWC3
 from cldm.model import create_model, load_state_dict
 from cldm.ddim_hacked import DDIMSampler
 
-XFORMERS_AVAILABLE = True
-if XFORMERS_AVAILABLE:
-    from modules.sd_hijack_optimizations import SdOptimizationXformers
-    opt = SdOptimizationXformers()
-    opt.apply()
+# XFORMERS_AVAILABLE = True
+# if XFORMERS_AVAILABLE:
+#     from modules.sd_hijack_optimizations import SdOptimizationXformers
+#     opt = SdOptimizationXformers()
+#     opt.apply()
 
 model = create_model('./models/control_sd15_colorize.yaml').cpu()
 model.load_state_dict(load_state_dict('./models/control_sd15_colorize_all.ckpt', location='cuda'))
