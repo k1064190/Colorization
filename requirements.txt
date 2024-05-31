@@ -1,0 +1,9 @@
+torch
+torchvision
+gradio
+h11
+pytorch-lightning==1.6.5
+numpy
+einops
+opencv-python
+open_clip_torch
