@@ -33,11 +33,11 @@ def LGB_TO_RGB(gray_image, rgb_image):
 
 def process(input_image, prompt, a_prompt, n_prompt, num_samples, image_resolution, ddim_steps, guess_mode, strength, scale, seed, eta, save_memory=False):
     # center crop image to square
-    H, W, _ = input_image.shape
-    if H > W:
-        input_image = input_image[(H - W) // 2:(H + W) // 2, :, :]
-    elif W > H:
-        input_image = input_image[:, (W - H) // 2:(H + W) // 2, :]
+    # H, W, _ = input_image.shape
+    # if H > W:
+    #     input_image = input_image[(H - W) // 2:(H + W) // 2, :, :]
+    # elif W > H:
+    #     input_image = input_image[:, (W - H) // 2:(H + W) // 2, :]
 
     with torch.no_grad():
         img = resize_image(input_image, image_resolution)
@@ -109,4 +109,4 @@ with block:
     run_button.click(fn=process, inputs=ips, outputs=[result_gallery])
 
 
-block.launch(server_name='localhost', server_port=7860, share=True)
+block.launch(share=True)
