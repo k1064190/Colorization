@@ -115,9 +115,9 @@ def process(input_image, prompt, a_prompt, n_prompt, num_samples, image_resoluti
         # results의 각 이미지를 mask를 이용해 mask가 0인 부분은 img 즉 흑백 이미지로 변환.
         # img를 channel이 3인 rgb 이미지로 변환
         gray_img = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)    # [H, W, 3]
-        results = [gray_img * (1 - mask[:, :, None]) + result * mask[:, :, None] for result, mask in zip(results, masks)]
+        final = [gray_img * (1 - mask[:, :, None]) + result * mask[:, :, None] for result, mask in zip(results, masks)]
 
-    return [detected_map.squeeze(-1)] + results
+    return [detected_map.squeeze(-1)] + results + masks + final
 
 
 block = gr.Blocks().queue()
