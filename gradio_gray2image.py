@@ -1,14 +1,29 @@
+import os
+from PIL import Image
+import json
+import random
+
 import cv2
 import einops
 import gradio as gr
 import numpy as np
 import torch
-import random
 
 from pytorch_lightning import seed_everything
 from annotator.util import resize_image, HWC3
 from cldm.model import create_model, load_state_dict
 from cldm.ddim_hacked import DDIMSampler
+
+import torch.nn as nn
+from torch.nn.functional import threshold, normalize,interpolate
+from torch.utils.data import Dataset
+from torch.optim import Adam
+from torch.utils.data import Dataset
+from torchvision import transforms
+from torch.utils.data import DataLoader
+from transformers import SamModel,SamProcessor,SamVisionConfig,SamConfig
+
+
 
 # XFORMERS_AVAILABLE = True
 # if XFORMERS_AVAILABLE:
@@ -20,6 +35,31 @@ model = create_model('./models/control_sd15_colorize.yaml').cpu()
 model.load_state_dict(load_state_dict('./models/control_sd15_colorize_epoch=156.ckpt', location='cuda'))
 model = model.cuda()
 ddim_sampler = DDIMSampler(model)
+
+class CustomSamModel(SamModel):
+    def __init__(self, config):
+        super(CustomSamModel, self).__init__(config)
+
+        # vision_encoder.patch_embed.projection 레이어를 수정합니다.
+        original_projection = self.vision_encoder.patch_embed.projection
+        bias = original_projection.bias is not None
+        self.vision_encoder.patch_embed.projection = nn.Conv2d(
+            in_channels=1,  # 흑백 이미지의 채널 수
+            out_channels=original_projection.out_channels,
+            kernel_size=original_projection.kernel_size,
+            stride=original_projection.stride,
+            padding=original_projection.padding,
+            bias=bias
+        )
+
+config = SamVisionConfig(num_channels=1, image_size=1024)
+config = SamConfig(vision_config = config)
+
+sam_model = CustomSamModel(config)
+sam_model.load_state_dict(torch.load('./models/sam_state_dict.pth'))
+sam_model.cuda()
+sam_model.eval()
+
 
 def LGB_TO_RGB(gray_image, rgb_image):
     # gray_image [H, W, 1]
@@ -45,8 +85,15 @@ def process(input_image, prompt, a_prompt, n_prompt, num_samples, image_resoluti
         if C == 3:
             img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
             detected_map = img[:, :, None]
+        control = torch.from_numpy(detected_map.copy()).float().cuda()
+        control = einops.rearrange(control, 'h w c -> 1 c h w')
 
-        control = torch.from_numpy(detected_map.copy()).float().cuda() / 255.0
+        with torch.no_grad():
+            pred = sam_model(control)
+            masks = pred.pred_masks # [1, 1, c, h, w]
+        masks = einops.rearrange(masks, '1 1 c h w -> h w c')
+
+        control = control / 255.0
         control = torch.stack([control for _ in range(num_samples)], dim=0)
         control = einops.rearrange(control, 'b h w c -> b c h w').clone()
 
@@ -78,7 +125,7 @@ def process(input_image, prompt, a_prompt, n_prompt, num_samples, image_resoluti
 
         results = [x_samples[i] for i in range(num_samples)]
         results = [LGB_TO_RGB(detected_map, result) for result in results]
-    return [detected_map.squeeze(-1)] + results
+    return [detected_map.squeeze(-1)] + results + [masks]
 
 
 block = gr.Blocks().queue()
