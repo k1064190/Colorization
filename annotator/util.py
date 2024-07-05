@@ -27,12 +27,22 @@ def HWC3(x):
 
 def resize_image(input_image, resolution):
     H, W, C = input_image.shape
-    H = float(H)
-    W = float(W)
-    k = float(resolution) / min(H, W)
-    H *= k
-    W *= k
-    H = int(np.round(H / 64.0)) * 64
-    W = int(np.round(W / 64.0)) * 64
-    img = cv2.resize(input_image, (W, H), interpolation=cv2.INTER_LANCZOS4 if k > 1 else cv2.INTER_AREA)
+    # H, W 중 짧은 쪽을 resolution과 맞춤
+
+    if H > W:
+        k = resolution / W
+        W = resolution
+        H = int(H * k)
+    else:
+        k = resolution / H
+        H = resolution
+        W = int(W * k)
+
+    input_image = cv2.resize(input_image, (W, H), interpolation=cv2.INTER_CUBIC)
+
+    # resolution으로 center crop
+    start_w = (W - resolution) // 2
+    start_h = (H - resolution) // 2
+    img = input_image[start_h:start_h + resolution, start_w:start_w + resolution]
+
     return img
