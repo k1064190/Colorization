@@ -117,7 +117,10 @@ def process(input_image, prompt, a_prompt, n_prompt, num_samples, image_resoluti
         gray_img = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)    # [H, W, 3]
         final = [gray_img * (1 - mask[:, :, None]) + result * mask[:, :, None] for result, mask in zip(results, masks)]
 
-    return [detected_map.squeeze(-1)] + results + masks + final
+    # mask to 255 img
+
+    mask_img = [mask * 255 for mask in masks]
+    return [detected_map.squeeze(-1)] + results + mask_img + final
 
 
 block = gr.Blocks().queue()
