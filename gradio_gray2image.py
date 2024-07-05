@@ -52,14 +52,18 @@ def process(input_image, prompt, a_prompt, n_prompt, num_samples, image_resoluti
     with torch.no_grad():
         img = resize_image(input_image, image_resolution)
         H, W, C = img.shape
+        print("img shape: ", img.shape)
         if C == 3:
             img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
             detected_map = img[:, :, None]
+            print("Gray image shape: ", detected_map.shape)
         control = torch.from_numpy(detected_map.copy()).float().cuda()
         control = einops.rearrange(control, 'h w c -> 1 c h w')
+        print("Control shape: ", control.shape)
 
         control = control / 255.0
         control = torch.stack([control for _ in range(num_samples)], dim=0)
+        print("Stacked control shape: ", control.shape)
         control = einops.rearrange(control, 'b h w c -> b c h w').clone()
 
         if seed == -1:
@@ -119,7 +123,7 @@ def process(input_image, prompt, a_prompt, n_prompt, num_samples, image_resoluti
 block = gr.Blocks().queue()
 with block:
     with gr.Row():
-        gr.Markdown("## Control Stable Diffusion with Canny Edge Maps")
+        gr.Markdown("## Control Stable Diffusion with Gray Image")
     with gr.Row():
         with gr.Column():
             input_image = gr.Image(sources=['upload'], type="numpy")
