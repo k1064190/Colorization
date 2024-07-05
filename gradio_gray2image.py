@@ -23,11 +23,18 @@ from torchvision import transforms
 from torch.utils.data import DataLoader
 from transformers import SegformerFeatureExtractor, SegformerForSemanticSegmentation
 
+import argparse
+
+parseargs = argparse.ArgumentParser()
+parseargs.add_argument('--model', type=str, default='control_sd15_colorize_epoch=156.ckpt')
+args = parseargs.parse_args()
+model_path = args.model
+
 feature_extractor = SegformerFeatureExtractor.from_pretrained("matei-dorian/segformer-b5-finetuned-human-parsing")
 segmodel = SegformerForSemanticSegmentation.from_pretrained("matei-dorian/segformer-b5-finetuned-human-parsing")
 
 model = create_model('./models/control_sd15_colorize.yaml').cpu()
-model.load_state_dict(load_state_dict('./models/control_sd15_colorize_epoch=156.ckpt', location='cuda'))
+model.load_state_dict(load_state_dict(f"./models/{model_path}", location='cuda'))
 model = model.cuda()
 ddim_sampler = DDIMSampler(model)
 
