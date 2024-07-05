@@ -58,7 +58,7 @@ def process(input_image, prompt, a_prompt, n_prompt, num_samples, image_resoluti
             detected_map = img[:, :, None]
             print("Gray image shape: ", detected_map.shape)
         control = torch.from_numpy(detected_map.copy()).float().cuda()
-        control = einops.rearrange(control, 'h w c -> 1 c h w')
+        # control = einops.rearrange(control, 'h w c -> 1 c h w')
         print("Control shape: ", control.shape)
 
         control = control / 255.0
