@@ -41,7 +41,7 @@ def LGB_TO_RGB(gray_image, rgb_image):
     return cv2.cvtColor(lab_image, cv2.COLOR_LAB2RGB)
 
 
-def process(input_image, prompt, a_prompt, n_prompt, num_samples, image_resolution, ddim_steps, guess_mode, strength, scale, seed, eta, save_memory=False):
+def process(input_image, prompt, a_prompt, n_prompt, num_samples, image_resolution, ddim_steps, guess_mode, strength, scale, seed, eta, threshold, save_memory=False):
     # center crop image to square
     # H, W, _ = input_image.shape
     # if H > W:
@@ -103,13 +103,13 @@ def process(input_image, prompt, a_prompt, n_prompt, num_samples, image_resoluti
             logits = outputs.logits
             logits = logits.squeeze(0)
             thresholded = torch.zeros_like(logits)
-            thresholded[logits > 0.5] = 1
+            thresholded[logits > threshold] = 1
             mask = thresholded[1: ,:, :].sum(dim=0)
             mask = mask.unsqueeze(0).unsqueeze(0)
             mask = interpolate(mask, size=(H, W), mode='bilinear')
             mask = mask.detach().numpy()
             mask = np.squeeze(mask)
-            mask = np.where(mask > 0.5, 1, 0)
+            mask = np.where(mask > threshold, 1, 0)
             masks.append(mask)
 
         # results의 각 이미지를 mask를 이용해 mask가 0인 부분은 img 즉 흑백 이미지로 변환.
@@ -139,6 +139,7 @@ with block:
                 guess_mode = gr.Checkbox(label='Guess Mode', value=False)
                 ddim_steps = gr.Slider(label="Steps", minimum=1, maximum=100, value=20, step=1)
                 scale = gr.Slider(label="Guidance Scale", minimum=0.1, maximum=30.0, value=1.0, step=0.1)
+                threshold = gr.Slider(label="segmentation threshold", minimum=0.1, maximum=0.9, value=0.5, step=0.05)
                 seed = gr.Slider(label="Seed", minimum=-1, maximum=2147483647, step=1, randomize=True)
                 eta = gr.Number(label="eta (DDIM)", value=0.0)
                 a_prompt = gr.Textbox(label="Added Prompt", value='best quality, extremely detailed')
@@ -147,7 +148,7 @@ with block:
         with gr.Column():
             # result_gallery = gr.Gallery(label='Output', show_label=False, elem_id="gallery").style(grid=2, height='auto')
             result_gallery = gr.Gallery(label='Output', show_label=False, elem_id="gallery")
-    ips = [input_image, prompt, a_prompt, n_prompt, num_samples, image_resolution, ddim_steps, guess_mode, strength, scale, seed, eta]
+    ips = [input_image, prompt, a_prompt, n_prompt, num_samples, image_resolution, ddim_steps, guess_mode, strength, scale, seed, eta, threshold]
     run_button.click(fn=process, inputs=ips, outputs=[result_gallery])
 
 
