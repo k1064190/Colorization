@@ -21,40 +21,10 @@ from torch.optim import Adam
 from torch.utils.data import Dataset
 from torchvision import transforms
 from torch.utils.data import DataLoader
-from transformers import SamModel,SamProcessor,SamVisionConfig,SamConfig
+from transformers import SegformerFeatureExtractor, SegformerForSemanticSegmentation
 
-
-
-# XFORMERS_AVAILABLE = True
-# if XFORMERS_AVAILABLE:
-#     from modules.sd_hijack_optimizations import SdOptimizationXformers
-#     opt = SdOptimizationXformers()
-#     opt.apply()
-
-class CustomSamModel(SamModel):
-    def __init__(self, config):
-        super(CustomSamModel, self).__init__(config)
-
-        # vision_encoder.patch_embed.projection 레이어를 수정합니다.
-        original_projection = self.vision_encoder.patch_embed.projection
-        bias = original_projection.bias is not None
-        self.vision_encoder.patch_embed.projection = nn.Conv2d(
-            in_channels=1,  # 흑백 이미지의 채널 수
-            out_channels=original_projection.out_channels,
-            kernel_size=original_projection.kernel_size,
-            stride=original_projection.stride,
-            padding=original_projection.padding,
-            bias=bias
-        )
-
-config = SamVisionConfig(num_channels=1, image_size=1024)
-config = SamConfig(vision_config = config)
-
-sam_model = CustomSamModel(config)
-sam_model.load_state_dict(torch.load('./models/sam_state_dict.pt'))
-sam_model.cuda()
-sam_model.eval()
-print("Loaded sam model")
+feature_extractor = SegformerFeatureExtractor.from_pretrained("matei-dorian/segformer-b5-finetuned-human-parsing")
+segmodel = SegformerForSemanticSegmentation.from_pretrained("matei-dorian/segformer-b5-finetuned-human-parsing")
 
 model = create_model('./models/control_sd15_colorize.yaml').cpu()
 model.load_state_dict(load_state_dict('./models/control_sd15_colorize_epoch=156.ckpt', location='cuda'))
@@ -88,11 +58,6 @@ def process(input_image, prompt, a_prompt, n_prompt, num_samples, image_resoluti
         control = torch.from_numpy(detected_map.copy()).float().cuda()
         control = einops.rearrange(control, 'h w c -> 1 c h w')
 
-        with torch.no_grad():
-            pred = sam_model(control)
-            masks = pred.pred_masks # [1, 1, c, h, w]
-        masks = einops.rearrange(masks, '1 1 c h w -> h w c')
-
         control = control / 255.0
         control = torch.stack([control for _ in range(num_samples)], dim=0)
         control = einops.rearrange(control, 'b h w c -> b c h w').clone()
@@ -125,7 +90,30 @@ def process(input_image, prompt, a_prompt, n_prompt, num_samples, image_resoluti
 
         results = [x_samples[i] for i in range(num_samples)]
         results = [LGB_TO_RGB(detected_map, result) for result in results]
-    return [detected_map.squeeze(-1)] + results + [masks]
+
+        # results의 각 이미지를 mask로 변환
+        masks = []
+        for result in results:
+            inputs = feature_extractor(images=result, return_tensors="pt")
+            outputs = segmodel(**inputs)
+            logits = outputs.logits
+            logits = logits.squeeze(0)
+            thresholded = torch.zeros_like(logits)
+            thresholded[logits > 0.5] = 1
+            mask = thresholded[1: ,:, :].sum(dim=0)
+            mask = mask.unsqueeze(0).unsqueeze(0)
+            mask = interpolate(mask, size=(H, W), mode='bilinear')
+            mask = mask.detach().numpy()
+            mask = np.squeeze(mask)
+            mask = np.where(mask > 0.5, 1, 0)
+            masks.append(mask)
+
+        # results의 각 이미지를 mask를 이용해 mask가 0인 부분은 img 즉 흑백 이미지로 변환.
+        # img를 channel이 3인 rgb 이미지로 변환
+        gray_img = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)    # [H, W, 3]
+        results = [gray_img * (1 - mask[:, :, None]) + result * mask[:, :, None] for result, mask in zip(results, masks)]
+
+    return [detected_map.squeeze(-1)] + results
 
 
 block = gr.Blocks().queue()
