@@ -56,9 +56,10 @@ config = SamVisionConfig(num_channels=1, image_size=1024)
 config = SamConfig(vision_config = config)
 
 sam_model = CustomSamModel(config)
-sam_model.load_state_dict(torch.load('./models/sam_state_dict.pth'))
+sam_model.load_state_dict(torch.load('./models/sam_state_dict.pt'))
 sam_model.cuda()
 sam_model.eval()
+print("Loaded sam model")
 
 
 def LGB_TO_RGB(gray_image, rgb_image):
