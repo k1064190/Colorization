@@ -25,6 +25,8 @@ from transformers import SegformerFeatureExtractor, SegformerForSemanticSegmenta
 
 import argparse
 
+device = "cuda" if torch.cuda.is_available() else "cpu"
+
 parseargs = argparse.ArgumentParser()
 parseargs.add_argument('--model', type=str, default='control_sd15_colorize_epoch=156.ckpt')
 args = parseargs.parse_args()
@@ -34,8 +36,8 @@ feature_extractor = SegformerFeatureExtractor.from_pretrained("matei-dorian/segf
 segmodel = SegformerForSemanticSegmentation.from_pretrained("matei-dorian/segformer-b5-finetuned-human-parsing")
 
 model = create_model('./models/control_sd15_colorize.yaml').cpu()
-model.load_state_dict(load_state_dict(f"./models/{model_path}", location='cuda'))
-model = model.cuda()
+model.load_state_dict(load_state_dict(f"./models/{model_path}", location=device))
+model = model.to(device)
 ddim_sampler = DDIMSampler(model)
 
 def LGB_TO_RGB(gray_image, rgb_image):
@@ -64,7 +66,7 @@ def process(input_image, prompt, a_prompt, n_prompt, num_samples, image_resoluti
             img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
             detected_map = img[:, :, None]
             print("Gray image shape: ", detected_map.shape)
-        control = torch.from_numpy(detected_map.copy()).float().cuda()
+        control = torch.from_numpy(detected_map.copy()).float().to(device)
         # control = einops.rearrange(control, 'h w c -> 1 c h w')
         print("Control shape: ", control.shape)
 
