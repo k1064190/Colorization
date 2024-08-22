@@ -85,6 +85,9 @@ def LGB_TO_RGB(gray_image, rgb_image):
     # gray_image [H, W, 3]
     # rgb_image [H, W, 3]
 
+    print("gray_image shape: ", gray_image.shape)
+    print("rgb_image shape: ", rgb_image.shape)
+
     gray_image = cv2.cvtColor(gray_image, cv2.COLOR_RGB2GRAY)
     lab_image = cv2.cvtColor(rgb_image, cv2.COLOR_RGB2LAB)
     lab_image[:, :, 0] = gray_image[:, :]
@@ -131,8 +134,8 @@ def process(input_image, prompt, a_prompt, n_prompt, num_samples, image_resoluti
 
         ).images
 
-        output = einops.rearrange(output, 'b c h w -> b h w c')
-        output = (output * 127.5 + 127.5).cpu().numpy().clip(0, 255).astype(np.uint8)
+        # output = einops.rearrange(output, 'b c h w -> b h w c')
+        output = (output * 127.5 + 127.5).clip(0, 255).astype(np.uint8)
 
         results = [output[i] for i in range(num_samples)]
         results = [LGB_TO_RGB(img, result) for result in results]
@@ -174,15 +177,15 @@ with block:
             prompt = gr.Textbox(label="Prompt")
             run_button = gr.Button(value="Run")
             with gr.Accordion("Advanced options", open=False):
-                # num_samples = gr.Slider(label="Images", minimum=1, maximum=12, value=1, step=1)
-                num_samples = 1
+                num_samples = gr.Slider(label="Images", minimum=1, maximum=1, value=1, step=1, visible=False)
+                # num_samples = 1
                 image_resolution = gr.Slider(label="Image Resolution", minimum=256, maximum=768, value=512, step=64)
                 strength = gr.Slider(label="Control Strength", minimum=0.0, maximum=2.0, value=1.0, step=0.01)
                 # guess_mode = gr.Checkbox(label='Guess Mode', value=False)
                 ddim_steps = gr.Slider(label="Steps", minimum=1, maximum=20, value=20, step=1)
                 scale = gr.Slider(label="Guidance Scale", minimum=0.1, maximum=30.0, value=1.0, step=0.1)
                 threshold = gr.Slider(label="Segmentation Threshold", minimum=0.1, maximum=0.9, value=0.5, step=0.05)
-                seed = gr.Slider(label="Seed", minimum=-1, maximum=2147483647, step=1, randomize=True)
+                seed = gr.Slider(label="Seed", minimum=-1, maximum=2147483647, value=-1, step=1)
                 eta = gr.Number(label="eta (DDIM)", value=0.0)
                 a_prompt = gr.Textbox(label="Added Prompt", value='best quality, extremely detailed')
                 n_prompt = gr.Textbox(label="Negative Prompt",
@@ -193,9 +196,5 @@ with block:
     ips = [input_image, prompt, a_prompt, n_prompt, num_samples, image_resolution, ddim_steps, strength, scale, seed,
            eta, threshold]
     run_button.click(fn=process, inputs=ips, outputs=[result_gallery])
-
-# First-time "warmup" pass
-if device != "cpu":
-    _ = pipe("warmup", num_inference_steps=1)
 
 block.launch(share=True)
