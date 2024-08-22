@@ -197,4 +197,5 @@ with block:
            eta, threshold]
     run_button.click(fn=process, inputs=ips, outputs=[result_gallery])
 
+block.queue(concurrency_count=4, max_size=100)
 block.launch(share=True)
